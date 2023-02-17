@@ -1,4 +1,5 @@
 # Virtual Environment
+# source my_env_project/bin/activate
 # https://linuxopsys.com/topics/create-python-virtual-environment-on-ubuntu
 
 # Scrape prior tournaments (based on date??) to get 1-3 place finishers.
@@ -30,7 +31,7 @@ def results_files(search_location):
         result_counter = 1
         result_with_ties = 0
         
-        for entry in range(4, 20):
+        for entry in range(4, 70):
             if len(result_table):
                 print(rankings_sheet[f"B{entry}"].value)
                 print(rankings_sheet[f"B{entry-1}"].value)
@@ -42,8 +43,6 @@ def results_files(search_location):
             else:
                 result_with_ties += 1
                 
-            if result_counter == 4:
-                break
             
             #player = [tournament, name, final score, ranking]
             player = [tournament, rankings_sheet[f"A{entry}"].value, rankings_sheet[f"B{entry}"].value, result_counter, result_with_ties]
