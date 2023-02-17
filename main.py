@@ -32,24 +32,41 @@ def results_files(search_location):
         result_with_ties = 0
         
         for entry in range(4, 70):
-            if len(result_table):
-                print(rankings_sheet[f"B{entry}"].value)
-                print(rankings_sheet[f"B{entry-1}"].value)
+            if len(result_table) and rankings_sheet[f"B{entry}"].value:
                 if (rankings_sheet[f"B{entry}"].value > rankings_sheet[f"B{entry-1}"].value):
                     result_counter += 1
                     result_with_ties += 1
+                    if len(result_table)+1 > result_counter:
+                        result_counter = result_with_ties
                 else:
                     result_with_ties += 1
             else:
                 result_with_ties += 1
-                
             
+            # Remove last (blank) value added by Excel Pivot Table
+            if rankings_sheet[f"B{entry}"].value:
+                if rankings_sheet[f"B{entry}"].value > 9999:
+                    continue
+            
+            # Remove blank rows
+            if rankings_sheet[f"C{entry}"].value in [None]:
+                continue
+            
+
+                
+            # Indicate ranking of "0" for teams that were CUT
+            if rankings_sheet[f"B{entry}"].value == 9999:
+                tournament_result = "0"
+            else:
+                tournament_result = result_counter
+                
             #player = [tournament, name, final score, ranking]
-            player = [tournament, rankings_sheet[f"A{entry}"].value, rankings_sheet[f"B{entry}"].value, result_counter, result_with_ties]
+            player = [tournament, rankings_sheet[f"A{entry}"].value, rankings_sheet[f"B{entry}"].value, tournament_result, result_with_ties]
             result_table.append(player)
-        
+        result_table_full.append(result_table)
+
         # need to add result tabel to full results
-    print(result_table)
+    print(result_table_full)
     
 def save_to_db(results):
     pass
