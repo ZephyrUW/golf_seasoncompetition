@@ -17,7 +17,7 @@ import pandas
 from rich import print, traceback
 traceback.install()
 
-def results_files(search_location):
+def results_files(search_location: str):
     xlsm_files = [file for file in os.listdir(search_location) if file[-5:] == ".xlsm"]
     print(xlsm_files)
     result_table_full = []
@@ -56,7 +56,7 @@ def results_files(search_location):
                 
             # Indicate ranking of "0" for teams that were CUT
             if rankings_sheet[f"B{entry}"].value == 9999:
-                tournament_result = "0"
+                tournament_result = 0
             else:
                 tournament_result = result_counter
                 
