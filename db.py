@@ -3,6 +3,9 @@ import sqlite3
 import shutil
 from datetime import datetime, date
 
+from rich import print, traceback
+traceback.install()
+
 class Database:
     def __init__(self, db):
         try:
@@ -18,9 +21,11 @@ class Database:
 
         self.cur = self.conn.cursor()
         self.cur.execute(
-            "CREATE TABLE IF NOT EXISTS housecharges (id INTEGER PRIMARY KEY, chargedate date, employee text, amt int)")
+            "CREATE TABLE IF NOT EXISTS golfresults (id INTEGER PRIMARY KEY, tournament text, entrant text, scoretotal int, placement int, junk int, importdate text)")
+        self.cur.execute(
+            "CREATE TABLE IF NOT EXISTS seasonresults (id INTEGER PRIMARY KEY, season text, entrant text, points int)")
         self.conn.commit()
-        if not (date.today().day % 3):
+        if not (date.today().day % 7):
             self.backup(db)
 
     def fetch_group(self, startdate, enddate=date.today()):
@@ -29,24 +34,34 @@ class Database:
         if type(enddate) is str:
             enddate = date.fromisoformat(enddate)
 
-        # todo Need to add chargedate ranges
         self.cur.execute("SELECT * FROM housecharges WHERE chargedate BETWEEN ? AND ?", (startdate, enddate, ))
         rows = self.cur.fetchall()
         # todo return sums?
         return rows
 
-    def fetch_one(self, name, startdate, enddate):
+    # def fetch_one(self, name, startdate, enddate):
         self.cur.execute("SELECT * FROM housecharges WHERE employee=? AND chargedate BETWEEN ? AND ?", (name, startdate, enddate))
         rows = self.cur.fetchall()
         return rows
 
-    def insert(self, chargedate, hc):
-        print(hc)
-        temp_hc = [[chargedate, i[0], int(i[1]*100)] for i in hc]
-        self.cur.executemany("INSERT INTO housecharges VALUES (NULL, ?, ?, ?)", temp_hc)
+    def insert_tournament(self, result_table, submit_date):
+        """Ingests a list of lists containing the results from a single tournament.
+           Adds results to golf_results.db        
+
+        Args:
+            result_table (list[list]): list of lists containing results from a single tournament
+            submit_date (date): today's date, when database is updated.  Used for season changes 
+        """
+        print(submit_date)
+        # Append the submission date to result_table...this is done in-place
+        [i.append(submit_date) for i in result_table]
+        
+        for i in result_table:
+            print([type(j) for j in i])
+            
+        self.cur.executemany(f"INSERT INTO golfresults VALUES (NULL, ?, ?, ?, ?, ?, ?)", result_table)
         self.conn.commit()
         
-        return len(temp_hc)
 
     def remove(self, id):
         self.cur.execute("DELETE FROM housecharges WHERE id=?", (id,))
@@ -69,26 +84,53 @@ class Database:
 
     def manual_entry(self, filename):
         wb = openpyxl.load_workbook(filename, keep_vba=True, read_only=True, data_only=True)
-        s = wb['Rankings']
-
-        # Create list of name and amount cells
-        # name_cells = [f'I{i}' for i in range(5,10)]
-        # name_cells.extend([f'K{i}' for i in range(4,10)])
-        # name_cells.extend([f'M{i}' for i in range(4,10)])
-        # amt_cells = [f'J{i}' for i in range(5,10)]
-        # amt_cells.extend([f'L{i}' for i in range(4,10)])
-        # amt_cells.extend([f'N{i}' for i in range(4,10)])
+        rankings_sheet = wb['Rankings']
         
-        #     # Get House Charges
-        # for i in range(len(name_cells)):
-        #     if s[amt_cells[i]].value == '' or s[amt_cells[i]].value == None or s[amt_cells[i]].value == ' ':
-        #         continue
-        #     hc.append([str(s[name_cells[i]].value).strip().title(), s[amt_cells[i]].value])
+        result_table = []
+        result_counter = 1
+        result_with_ties = 0
+        
+        tournament = filename.split("/")[-1].split('.')[0]
+        
+        for entry in range(4, 100):
+            if len(result_table) and rankings_sheet[f"B{entry}"].value:
+                if (rankings_sheet[f"B{entry}"].value > rankings_sheet[f"B{entry-1}"].value):
+                    result_counter += 1
+                    result_with_ties += 1
+                    if len(result_table)+1 > result_counter:
+                        result_counter = result_with_ties
+                else:
+                    result_with_ties += 1
+            else:
+                result_with_ties += 1
             
+            # Remove last (blank) value added by Excel Pivot Table
+            if rankings_sheet[f"B{entry}"].value:
+                if rankings_sheet[f"B{entry}"].value > 9999:
+                    continue
+            
+            # Remove blank rows
+            if rankings_sheet[f"C{entry}"].value in [None]:
+                continue
+            
+
+                
+            # Indicate ranking of "0" for teams that were CUT
+            if rankings_sheet[f"B{entry}"].value == 9999:
+                tournament_result = 0
+            else:
+                tournament_result = result_counter
+                
+            #player = [tournament, name, final score, ranking]
+            player = [tournament, rankings_sheet[f"A{entry}"].value, rankings_sheet[f"B{entry}"].value, tournament_result, result_with_ties]
+            result_table.append(player)
+        
+        # print(result_table)
+
         wb.close()
         # print((filename.split('.')[0].split('\\')[-1]))
         
-        # _ = self.insert(date.fromisoformat(filename.split('.')[0].split('\\')[-1]), hc)
+        self.insert_tournament(result_table, date.today())
 
     def __del__(self):
         try:
@@ -106,18 +148,19 @@ if __name__ == '__main__':
     folder = '\\\\DESKTOP-06TLJUH\\Users\\PIN AND CUE\\Desktop\\Shared Drive\\Scott\\Golf\\'
     
     ## TESTING ##
-    folder = "./test_results"
+    folder = "./test_results/"
     # Fix for no network access...unkown reason why...
     # folder = "Z:/"
 
     files = os.listdir(folder)
     
     golf_files = [i for i in files if ".xlsm" in i]
-    print(files)
-    print(golf_files)
+    # print(files)
+    # print(golf_files)
     
-    start = int(input('Type ENTER to import all files listed above\n'))
+    start = input('Type ENTER to import all files listed above\n')
     
     for excel in golf_files:
+        print(excel)
         db.manual_entry(f'{folder}{excel}')
             
