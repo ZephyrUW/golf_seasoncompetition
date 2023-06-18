@@ -17,7 +17,7 @@ import pandas
 from rich import print, traceback
 traceback.install()
 
-def results_files(search_location: str):
+def results_files(search_location: str, season: int = 2023):
     xlsm_files = [file for file in os.listdir(search_location) if file[-5:] == ".xlsm"]
     print(xlsm_files)
     result_table_full = []
